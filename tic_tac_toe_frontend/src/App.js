@@ -27,6 +27,7 @@ function App() {
    * Core Tic Tac Toe App
    * - Provides game state and layout.
    * - Handles theme, board, score, and controls.
+   * - Handles game session ID and session switching.
    */
   const [theme, setTheme] = useState('light');
   const [board, setBoard] = useState(emptyBoard());
@@ -34,6 +35,10 @@ function App() {
   const [mode, setMode] = useState("pvp"); // "pvp" or "pvc"
   const [scores, setScores] = useState({ X: 0, O: 0 });
   const [gameOver, setGameOver] = useState(false);
+
+  // Session and joining/creating game state
+  const [gameId, setGameId] = useState("");
+  const [pendingJoinId, setPendingJoinId] = useState(""); // for join input field
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -69,11 +74,31 @@ function App() {
     setScores({ X: 0, O: 0 });
   };
 
+  // PUBLIC_INTERFACE
+  const handleCreateGame = () => {
+    // Generate a new short pseudo-random game ID for demo
+    const newId =
+      Math.random().toString(36).substr(2, 6).toUpperCase();
+    setGameId(newId);
+    setBoard(emptyBoard());
+    setScores({ X: 0, O: 0 });
+    setGameOver(false);
+    setCurrentPlayer("X");
+  };
+
+  // PUBLIC_INTERFACE
+  const handleJoinGame = () => {
+    if (pendingJoinId && pendingJoinId.length >= 3) {
+      setGameId(pendingJoinId.toUpperCase());
+      setBoard(emptyBoard());
+      setScores({ X: 0, O: 0 });
+      setGameOver(false);
+      setCurrentPlayer("X");
+    }
+  };
+
   // Determine winner or draw (stub)
   const status = getGameStatus(board);
-
-  // Example: on game over, setGameOver(true);
-  // (Stub integration – game logic and AI not included yet)
 
   return (
     <div className="App">
@@ -85,7 +110,18 @@ function App() {
         {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
       </button>
       <main className="ttt-main-container">
-        <h1 className="ttt-title">Tic Tac Toe</h1>
+        <h1 className="ttt-title" style={{ color: "#1976d2" }}>Tic Tac ToeEe</h1>
+        {gameId && (
+          <div style={{
+            marginBottom: 10,
+            padding: "6px 0",
+            fontWeight: 600,
+            color: "#1976d2",
+            letterSpacing: "1px"
+          }}>
+            <span>Active Game ID:&nbsp;<span style={{background:'#eee',padding:'1px 7px',borderRadius:'4px',color:'#1976d2'}}>{gameId}</span></span>
+          </div>
+        )}
         <ScorePanel scores={scores} mode={mode} />
         <Board
           board={board}
@@ -97,6 +133,11 @@ function App() {
           onModeChange={handleModeChange}
           currentPlayer={currentPlayer}
           gameOver={gameOver}
+          gameId={gameId}
+          onCreateGame={handleCreateGame}
+          pendingJoinId={pendingJoinId}
+          setPendingJoinId={setPendingJoinId}
+          onJoinGame={handleJoinGame}
         />
         <ResetButton onReset={handleReset} gameOver={gameOver} />
       </main>
