@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import Board from "./components/Board";
 import ScorePanel from "./components/ScorePanel";
 import Controls from "./components/Controls";
 import ResetButton from "./components/ResetButton";
+import { subscribeGame, unsubscribeGame, sendMove } from "./realtime";
 
 // Utility to create an empty 3x3 board
 const emptyBoard = () => [
@@ -12,13 +13,20 @@ const emptyBoard = () => [
   [null, null, null],
 ];
 
-// Checks if the board is full or there's a winner (stub, logic to be added)
+// Winner/draw stub
 function getGameStatus(board) {
   // TODO: Implement winner detection
   return {
     winner: null,
     isFull: !board.flat().includes(null),
   };
+}
+
+/**
+ * Returns a shallow-equality test for board state arrays.
+ */
+function isSameBoard(a, b) {
+  return a.flat().join("") === b.flat().join("");
 }
 
 // PUBLIC_INTERFACE
@@ -40,6 +48,30 @@ function App() {
   const [gameId, setGameId] = useState("");
   const [pendingJoinId, setPendingJoinId] = useState(""); // for join input field
 
+  // Track latest refs for real-time sync
+  const boardRef = useRef();
+  const currentPlayerRef = useRef();
+  boardRef.current = board;
+  currentPlayerRef.current = currentPlayer;
+
+  // Subscribe/unsubscribe realtime
+  useEffect(() => {
+    if (!gameId) return;
+    // Handler for incoming real-time move updates
+    function onRealtimeMsg(msg) {
+      // Accept { type: 'move', board, currentPlayer }
+      if (msg.type === "move" && Array.isArray(msg.board)) {
+        if (!isSameBoard(msg.board, boardRef.current)) {
+          setBoard(msg.board);
+          setCurrentPlayer(msg.currentPlayer === "X" ? "X" : "O");
+        }
+      }
+      // Implement handling of reset/gameOver updates if implemented backend
+    }
+    subscribeGame(gameId, onRealtimeMsg);
+    return () => unsubscribeGame(gameId);
+  }, [gameId]);
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
@@ -55,8 +87,17 @@ function App() {
     const updated = board.map(row => [...row]);
     updated[i][j] = currentPlayer;
     setBoard(updated);
-    // Game status would be recalculated here
-    // TODO: Add logic for winner/computer/player turn handling
+
+    // Try to send move to backend (if in a session)
+    if (gameId) {
+      sendMove(gameId, {
+        type: "move",
+        player: currentPlayer,
+        position: [i, j],
+        board: updated,
+        currentPlayer: currentPlayer === "X" ? "O" : "X"
+      });
+    }
     setCurrentPlayer((prev) => (prev === "X" ? "O" : "X"));
   };
 
@@ -65,6 +106,14 @@ function App() {
     setBoard(emptyBoard());
     setGameOver(false);
     setCurrentPlayer("X");
+
+    if (gameId) {
+      sendMove(gameId, {
+        type: "reset",
+        board: emptyBoard(),
+        currentPlayer: "X"
+      });
+    }
   };
 
   // PUBLIC_INTERFACE
